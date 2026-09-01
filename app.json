@@ -55,6 +55,9 @@
         "ios": "<REVENUECAT_APPLE_API_KEY>",
         "android": "<REVENUECAT_GOOGLE_API_KEY>",
         "shared": "<OPTIONAL_SINGLE_KEY_FOR_BOTH_PLATFORMS>"
+      },
+      "eas": {
+        "projectId": "b5b378d8-6ff7-4018-9921-f83e2820a9c6"
       }
     }
   }
