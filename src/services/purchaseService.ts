@@ -26,17 +26,33 @@ export const PRO_ENTITLEMENT = 'pro_access';
  * Fallback SDK key, used when neither an environment variable nor app.json
  * supplies a platform key.
  *
- * This is a RevenueCat **Test Store** key (`test_` prefix). Test Store keys
- * simulate purchases and cannot process real transactions — RevenueCat's own
- * guidance is never to submit a build configured with one. Ship by setting the
- * platform keys (see `readApiKey`), which take precedence over this constant
- * and need no code change.
+ * This is a RevenueCat **Test Store** key (`test_` prefix). It is never handed
+ * to the native SDK (see `isProductionKey`); it exists so that a build with no
+ * key configured still reports itself as "simulated purchases" rather than as
+ * a plain missing-key error. Ship by setting the platform keys (see
+ * `readApiKey`), which take precedence over this constant.
  */
 const FALLBACK_API_KEY = 'test_mOMEmTidbhFViNXtwBosGoAiHfy';
 
 /** True for RevenueCat Test Store keys, which must not reach a store build. */
 function isTestStoreKey(key: string): boolean {
   return key.startsWith('test_');
+}
+
+/** Prefix of a live RevenueCat SDK key for the platform we are running on. */
+const PRODUCTION_KEY_PREFIX = Platform.OS === 'ios' ? 'appl_' : 'goog_';
+
+/**
+ * True only for a key the native SDK will accept on this platform.
+ *
+ * This gate is not cosmetic. Handed a Test Store key, a placeholder, or a key
+ * belonging to the other platform, the RevenueCat native SDK does not degrade
+ * gracefully: it puts up a "Wrong API key" alert and force-closes the app.
+ * Anything that is not a live key for the current platform must therefore
+ * never reach `configure()`.
+ */
+function isProductionKey(key: string): boolean {
+  return key.startsWith(PRODUCTION_KEY_PREFIX);
 }
 
 /**
@@ -122,6 +138,8 @@ type PurchasesModule = typeof import('react-native-purchases').default;
 let purchases: PurchasesModule | null = null;
 let mockMode = true;
 let configured = false;
+/** Set when a Test Store key was resolved and deliberately not configured. */
+let usingTestStore = false;
 
 /** True when running against mocks rather than the real store. */
 export function isMockMode(): boolean {
@@ -132,19 +150,22 @@ export function isMockMode(): boolean {
 export function mockModeReason(): string | null {
   if (!mockMode) return null;
   if (IS_EXPO_GO) return 'Expo Go (no native module)';
-  if (!readApiKey()) return 'no RevenueCat API key configured';
+  const key = readApiKey();
+  if (!key) return 'no RevenueCat API key configured';
+  if (isTestStoreKey(key)) return 'RevenueCat Test Store key (native SDK not initialised)';
+  if (!isProductionKey(key)) {
+    return `API key is not a ${PRODUCTION_KEY_PREFIX} key for ${Platform.OS}`;
+  }
   return 'RevenueCat SDK unavailable';
 }
 
 /**
- * True when the SDK is live but running on a Test Store key, so purchases are
- * simulated by RevenueCat rather than by a real store. Surfaced on the paywall
- * so this state cannot be mistaken for working production billing.
+ * True when a Test Store key was resolved, so purchases are simulated in-process
+ * and the native SDK was deliberately left uninitialised. Surfaced on the
+ * paywall so this state cannot be mistaken for working production billing.
  */
 export function isUsingTestStore(): boolean {
-  if (mockMode) return false;
-  const key = readApiKey();
-  return key !== null && isTestStoreKey(key);
+  return usingTestStore;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +220,22 @@ export async function configurePurchases(): Promise<void> {
     return;
   }
 
+  // Never hand a non-production key to the native SDK. RevenueCat validates the
+  // key inside `configure()` and, on rejecting it, shows a "Wrong API key" alert
+  // and force-closes the app — which takes down a standalone preview build on
+  // launch. Falling back to simulated purchases keeps such builds usable.
+  if (!isProductionKey(apiKey)) {
+    mockMode = true;
+    usingTestStore = isTestStoreKey(apiKey);
+    console.warn(
+      `[purchases] ${mockModeReason()} — skipping Purchases.configure() to ` +
+        'avoid the native SDK force-closing the app, and running with ' +
+        `simulated purchases instead. Set a ${PRODUCTION_KEY_PREFIX} key to ` +
+        'enable real billing.'
+    );
+    return;
+  }
+
   try {
     // Guarded require: the module is absent wherever the native side is.
     const module = require('react-native-purchases');
@@ -209,16 +246,6 @@ export async function configurePurchases(): Promise<void> {
     sdk.configure({ apiKey });
     purchases = sdk;
     mockMode = false;
-
-    if (isTestStoreKey(apiKey)) {
-      // Deliberately not silenced in release: a store build on a Test Store
-      // key takes no money, and this is the last chance to notice.
-      console.warn(
-        '[purchases] configured with a RevenueCat TEST STORE key — purchases ' +
-          'are simulated and no real transaction can complete. Set the ' +
-          'platform keys before submitting to the App Store or Google Play.'
-      );
-    }
   } catch (err) {
     mockMode = true;
     console.warn('[purchases] falling back to mock mode', err);

@@ -247,7 +247,8 @@ export default function PaywallModal({ navigation, route }: Props) {
   ];
 
   const devReason = mockModeReason();
-  // Live SDK, simulated money: worth saying out loud on the buying screen.
+  // Simulated money: worth saying out loud on the buying screen, and more
+  // specific than the generic mock-mode reason, so it wins the banner.
   const testStore = isUsingTestStore();
 
   return (
@@ -278,9 +279,9 @@ export default function PaywallModal({ navigation, route }: Props) {
         {devReason || testStore ? (
           <View style={[styles.devNotice, { borderColor: theme.colors.accent }]}>
             <Text style={[styles.devNoticeText, { color: theme.colors.accent }]}>
-              {devReason
-                ? t('paywall.devModeNotice', { reason: devReason })
-                : t('paywall.testStoreNotice')}
+              {testStore
+                ? t('paywall.testStoreNotice')
+                : t('paywall.devModeNotice', { reason: devReason })}
             </Text>
           </View>
         ) : null}
