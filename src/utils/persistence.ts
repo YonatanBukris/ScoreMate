@@ -13,10 +13,14 @@ import { getTemplate } from '../types/templates';
  */
 export const STORAGE_KEY = 'scorekeeper/state/v1';
 
+/** Keeps a pasted essay out of storage and out of the player chips. */
+export const DISPLAY_NAME_MAX_LENGTH = 24;
+
 export const EMPTY_STATE: PersistedState = {
   games: [],
   activeGameId: null,
   isPro: false,
+  displayName: '',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -133,6 +137,8 @@ export function parsePersistedState(raw: string | null): PersistedState {
     games,
     activeGameId: pointerIsUsable ? pointer : (newestActive?.id ?? null),
     isPro: parsed.isPro === true,
+    // Absent for anyone who saved state before the settings screen existed.
+    displayName: str(parsed.displayName, '').slice(0, DISPLAY_NAME_MAX_LENGTH),
   };
 }
 

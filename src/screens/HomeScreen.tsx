@@ -25,6 +25,7 @@ import {
   Play,
   Plus,
   Repeat,
+  Settings as SettingsIcon,
   Sliders,
   Spade,
   Target,
@@ -68,10 +69,13 @@ const TEMPLATE_ICONS: Record<GameModeType, React.ComponentType<{ size: number; c
 export default function HomeScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
-  const { activeGames, createGame, deleteGame, isPro, resumeGame } = useGame();
+  const { activeGames, createGame, deleteGame, displayName, isPro, resumeGame } = useGame();
 
   const [templateId, setTemplateId] = useState(GAME_TEMPLATES[0].id);
-  const [names, setNames] = useState<string[]>(['', '']);
+  // Seeded once from the saved profile name, so the player is not retyping
+  // their own name every game. Later edits in settings leave a setup already in
+  // progress alone rather than overwriting what is on screen.
+  const [names, setNames] = useState<string[]>(() => [displayName, '']);
   // Held here rather than on the template so edits survive switching away to
   // another game mode and back again.
   const [customRules, setCustomRules] = useState<GameRules>(DEFAULT_CUSTOM_RULES);
@@ -206,13 +210,31 @@ export default function HomeScreen({ navigation }: Props) {
               <Trophy size={24} color="#FFFFFF" />
             </LinearGradient>
             <View style={styles.flex}>
-              <Text style={[theme.type.title, { color: theme.colors.text }]}>
+              <Text
+                style={[theme.type.title, { color: theme.colors.text }]}
+                numberOfLines={1}
+              >
                 {t('app.title')}
               </Text>
-              <Text style={[theme.type.label, { color: theme.colors.textMuted }]}>
+              <Text
+                style={[theme.type.label, { color: theme.colors.textMuted }]}
+                numberOfLines={1}
+              >
                 {t('app.tagline')}
               </Text>
             </View>
+            <Pressable3D
+              onPress={() => {
+                haptics.tap();
+                navigation.navigate('Settings');
+              }}
+              accessibilityLabel={t('settings.title')}
+              style={styles.iconButtonSlot}
+            >
+              <Card style={styles.iconButton}>
+                <SettingsIcon size={20} color={theme.colors.textMuted} />
+              </Card>
+            </Pressable3D>
             <Pressable3D
               onPress={() => {
                 haptics.tap();
@@ -529,8 +551,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
   content: { padding: 16, paddingBottom: 110, gap: 14 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logo: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logo: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', marginRight: 4 },
   iconButtonSlot: { width: 42, height: 42 },
   iconButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   proBannerSlot: { height: 74 },

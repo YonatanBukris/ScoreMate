@@ -6,12 +6,14 @@ import GameScreen from '../screens/GameScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import PaywallModal from '../screens/PaywallModal';
 import PodiumScreen from '../screens/PodiumScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import type { PaywallTrigger } from '../services/analyticsService';
 
 export type RootStackParamList = {
   Home: undefined;
   Game: undefined;
   History: undefined;
+  Settings: undefined;
   /** Final standings for a completed game. */
   Podium: { gameId: string };
   /** `trigger` attributes the impression in the conversion funnel. */
@@ -29,6 +31,7 @@ export default function RootNavigator() {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Game" component={GameScreen} />
       <Stack.Screen name="History" component={HistoryScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen
         name="Podium"
         component={PodiumScreen}

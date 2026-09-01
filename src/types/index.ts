@@ -77,4 +77,6 @@ export interface PersistedState {
   games: Game[];
   activeGameId: string | null;
   isPro: boolean;
+  /** The player's own name, used to prefill the first slot of a new game. */
+  displayName: string;
 }

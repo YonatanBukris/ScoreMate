@@ -13,6 +13,7 @@ export type PaywallTrigger =
   | 'voice_announcer'
   | 'banner'
   | 'celebration'
+  | 'settings'
   | 'unknown';
 
 /** Plans the paywall can offer. */

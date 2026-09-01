@@ -37,6 +37,18 @@ function isSupported(code: string | null | undefined): code is SupportedLanguage
   return !!code && (SUPPORTED_LANGUAGES as readonly string[]).includes(code);
 }
 
+/**
+ * The manual choice, or null while the app is following the device. Mirrored in
+ * memory so the settings picker can tell "German because you chose it" apart
+ * from "German because the phone is", which the i18next language alone cannot.
+ */
+let languageOverride: SupportedLanguage | null = null;
+
+/** The explicit language choice, or null when following the device language. */
+export function getLanguageOverride(): SupportedLanguage | null {
+  return languageOverride;
+}
+
 function resolveDeviceLanguage(): SupportedLanguage {
   const deviceCode = getLocales()[0]?.languageCode ?? 'en';
   return isSupported(deviceCode) ? deviceCode : 'en';
@@ -70,6 +82,7 @@ export function getSpeechLocale(): string {
  */
 export async function setAppLanguage(lang: SupportedLanguage): Promise<void> {
   await i18n.changeLanguage(lang);
+  languageOverride = lang;
   try {
     await AsyncStorage.setItem(LANGUAGE_KEY, lang);
   } catch (err) {
@@ -80,6 +93,7 @@ export async function setAppLanguage(lang: SupportedLanguage): Promise<void> {
 /** Drops the manual override and falls back to the device language. */
 export async function resetToDeviceLanguage(): Promise<void> {
   await i18n.changeLanguage(resolveDeviceLanguage());
+  languageOverride = null;
   try {
     await AsyncStorage.removeItem(LANGUAGE_KEY);
   } catch (err) {
@@ -91,8 +105,9 @@ export async function resetToDeviceLanguage(): Promise<void> {
 export async function restoreStoredLanguage(): Promise<void> {
   try {
     const stored = await AsyncStorage.getItem(LANGUAGE_KEY);
-    if (isSupported(stored) && stored !== i18n.language) {
-      await i18n.changeLanguage(stored);
+    if (isSupported(stored)) {
+      languageOverride = stored;
+      if (stored !== i18n.language) await i18n.changeLanguage(stored);
     }
   } catch (err) {
     console.warn('Failed to restore language', err);

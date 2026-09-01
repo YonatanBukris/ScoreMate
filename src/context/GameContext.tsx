@@ -10,7 +10,11 @@ import React, {
 import { Game, GameRules, PersistedState, Player, Round, WinCondition } from '../types';
 import { getTemplate } from '../types/templates';
 import { rulesFromTemplate } from '../utils/rules';
-import { loadPersistedState, savePersistedState } from '../utils/persistence';
+import {
+  DISPLAY_NAME_MAX_LENGTH,
+  loadPersistedState,
+  savePersistedState,
+} from '../utils/persistence';
 import { restoreStoredLanguage } from '../i18n';
 import {
   configurePurchases,
@@ -41,6 +45,12 @@ interface GameContextValue {
   activeGames: Game[];
   completedGames: Game[];
   isPro: boolean;
+  /** The player's own name; empty when they have not set one. */
+  displayName: string;
+  /** Trimmed and length-capped before it is stored. */
+  setDisplayName: (name: string) => void;
+  /** Lifetime totals over completed games, for the settings screen. */
+  stats: { gamesPlayed: number; playersRecorded: number };
   createGame: (options: NewGameOptions) => Game;
   /** Points the game screen at an existing paused session. */
   resumeGame: (gameId: string) => void;
@@ -87,6 +97,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [games, setGames] = useState<Game[]>([]);
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
   const [isPro, setIsPro] = useState(false);
+  const [displayName, setDisplayNameState] = useState('');
 
   // Avoid writing back the initial empty state before hydration completes.
   const hydrated = useRef(false);
@@ -103,6 +114,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setActiveGameId(stored.activeGameId);
         const storedIsPro = stored.isPro;
         setIsPro(storedIsPro);
+        setDisplayNameState(stored.displayName);
 
         if (isMockMode()) {
           // No store to ask: the persisted flag is the source of truth, which
@@ -127,9 +139,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated.current) return;
-    const state: PersistedState = { games, activeGameId, isPro };
+    const state: PersistedState = { games, activeGameId, isPro, displayName };
     savePersistedState(state);
-  }, [games, activeGameId, isPro]);
+  }, [games, activeGameId, isPro, displayName]);
 
   const activeGame = useMemo(
     () => games.find((g) => g.id === activeGameId && g.isActive) ?? null,
@@ -150,6 +162,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)),
     [games]
   );
+
+  /**
+   * Lifetime totals shown in settings. Players are counted by distinct name
+   * rather than by seat, so the same four friends across ten games read as
+   * four players and not forty.
+   */
+  const stats = useMemo(() => {
+    const names = new Set<string>();
+    for (const game of completedGames) {
+      for (const player of game.players) {
+        const name = player.name.trim().toLowerCase();
+        if (name) names.add(name);
+      }
+    }
+    return { gamesPlayed: completedGames.length, playersRecorded: names.size };
+  }, [completedGames]);
+
+  const setDisplayName = useCallback((name: string) => {
+    setDisplayNameState(name.trim().slice(0, DISPLAY_NAME_MAX_LENGTH));
+  }, []);
 
   const createGame = useCallback((options: NewGameOptions): Game => {
     const template = getTemplate(options.templateId);
@@ -283,6 +315,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     activeGames,
     completedGames,
     isPro,
+    displayName,
+    setDisplayName,
+    stats,
     createGame,
     resumeGame,
     applyScore,
