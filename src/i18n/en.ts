@@ -1,6 +1,6 @@
 const en = {
   app: {
-    title: 'Scorekeeper',
+    title: 'ScoreMate',
     tagline: 'Board & card game scores, offline.',
   },
   common: {
@@ -176,7 +176,7 @@ const en = {
     confirmDeleteMessage: 'This game will be permanently removed.',
   },
   paywall: {
-    title: 'Scorekeeper Pro',
+    title: 'ScoreMate Pro',
     subtitle: 'Unlock everything, forever.',
     featureUnlimitedPlayers: 'Unlimited players',
     featureUnlimitedPlayersDesc: 'Go beyond {{count}} players per game',
@@ -191,7 +191,7 @@ const en = {
     bannerTitle: 'Go Pro',
     bannerSubtitle: 'Unlimited players, voice & stats',
     proActive: 'Pro unlocked. Thank you!',
-    headline: 'Unlock the full Scorekeeper',
+    headline: 'Unlock the full ScoreMate',
     valueProps: 'Everything included',
     featureHistory: 'Full game history',
     featureHistoryDesc: 'Every game you have ever played, kept forever',

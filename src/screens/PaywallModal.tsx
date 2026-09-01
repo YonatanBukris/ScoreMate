@@ -44,9 +44,12 @@ import { track, type PaywallTrigger } from '../services/analyticsService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
 
-/** Replace with the real hosted documents before submitting to the stores. */
-const TERMS_URL = 'https://example.com/scorekeeper/terms';
-const PRIVACY_URL = 'https://example.com/scorekeeper/privacy';
+/**
+ * The published legal page. Both documents live on one page, so each link
+ * deep-links to its own section rather than dropping the reader at the top.
+ */
+const TERMS_URL = 'https://yonatanbukris.github.io/ScoreMate/#terms';
+const PRIVACY_URL = 'https://yonatanbukris.github.io/ScoreMate/#privacy';
 
 export default function PaywallModal({ navigation, route }: Props) {
   const { t } = useTranslation();

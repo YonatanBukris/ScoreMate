@@ -2,7 +2,7 @@ import type { TranslationSchema } from './en';
 
 const de: TranslationSchema = {
   app: {
-    title: 'Punktezähler',
+    title: 'ScoreMate',
     tagline: 'Brett- & Kartenspiel-Punkte, offline.',
   },
   common: {
@@ -178,7 +178,7 @@ const de: TranslationSchema = {
     confirmDeleteMessage: 'Dieses Spiel wird dauerhaft entfernt.',
   },
   paywall: {
-    title: 'Punktezähler Pro',
+    title: 'ScoreMate Pro',
     subtitle: 'Alles freischalten, für immer.',
     featureUnlimitedPlayers: 'Unbegrenzte Spieler',
     featureUnlimitedPlayersDesc: 'Mehr als {{count}} Spieler pro Spiel',
@@ -193,7 +193,7 @@ const de: TranslationSchema = {
     bannerTitle: 'Pro holen',
     bannerSubtitle: 'Unbegrenzte Spieler, Sprache & Statistiken',
     proActive: 'Pro freigeschaltet. Danke!',
-    headline: 'Punktezähler voll freischalten',
+    headline: 'ScoreMate voll freischalten',
     valueProps: 'Alles enthalten',
     featureHistory: 'Vollständiger Spielverlauf',
     featureHistoryDesc: 'Jedes gespielte Spiel bleibt dauerhaft erhalten',

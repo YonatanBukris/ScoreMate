@@ -2,7 +2,7 @@ import type { TranslationSchema } from './en';
 
 const nl: TranslationSchema = {
   app: {
-    title: 'Puntenteller',
+    title: 'ScoreMate',
     tagline: 'Bord- & kaartspelscores, offline.',
   },
   common: {
@@ -178,7 +178,7 @@ const nl: TranslationSchema = {
     confirmDeleteMessage: 'Dit spel wordt permanent verwijderd.',
   },
   paywall: {
-    title: 'Puntenteller Pro',
+    title: 'ScoreMate Pro',
     subtitle: 'Ontgrendel alles, voor altijd.',
     featureUnlimitedPlayers: 'Onbeperkt spelers',
     featureUnlimitedPlayersDesc: 'Meer dan {{count}} spelers per spel',
@@ -193,7 +193,7 @@ const nl: TranslationSchema = {
     bannerTitle: 'Word Pro',
     bannerSubtitle: 'Onbeperkt spelers, stem & statistieken',
     proActive: 'Pro ontgrendeld. Bedankt!',
-    headline: 'Ontgrendel Puntenteller volledig',
+    headline: 'Ontgrendel ScoreMate volledig',
     valueProps: 'Alles inbegrepen',
     featureHistory: 'Volledige spelgeschiedenis',
     featureHistoryDesc: 'Elk gespeeld spel blijft voorgoed bewaard',

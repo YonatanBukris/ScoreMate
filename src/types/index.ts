@@ -1,5 +1,5 @@
 /**
- * Core domain types for the Scorekeeper app.
+ * Core domain types for the ScoreMate app.
  */
 
 /** Identifiers for the built-in game templates. */
