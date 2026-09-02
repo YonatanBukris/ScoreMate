@@ -10,6 +10,8 @@
 /** Where a paywall impression came from, for funnel attribution. */
 export type PaywallTrigger =
   | 'player_limit'
+  | 'game_quota'
+  | 'preset_limit'
   | 'voice_announcer'
   | 'banner'
   | 'celebration'
@@ -48,6 +50,17 @@ export type AnalyticsEvent =
   | { name: 'purchase_cancelled'; properties: { plan: PlanId; viaExitOffer: boolean } }
   | { name: 'purchase_failed'; properties: { plan: PlanId; reason: string } }
   | { name: 'purchases_restored'; properties: { isPro: boolean; mock: boolean } }
+  | {
+      /** A free user was turned away from starting a game by the monthly quota. */
+      name: 'game_quota_blocked';
+      properties: { gamesThisMonth: number; limit: number; from: 'setup' | 'rematch' };
+    }
+  | {
+      name: 'preset_saved';
+      properties: { templateId: string; playerCount: number; presetCount: number };
+    }
+  | { name: 'preset_loaded'; properties: { templateId: string } }
+  | { name: 'preset_deleted'; properties: { templateId: string } }
   | {
       name: 'game_finished';
       properties: {

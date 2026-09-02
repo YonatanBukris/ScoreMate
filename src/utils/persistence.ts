@@ -1,15 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { Game, PersistedState, Player, Round, WinCondition } from '../types';
+import type {
+  Game,
+  GamePreset,
+  MonthlyGameCounts,
+  PersistedState,
+  Player,
+  Round,
+  WinCondition,
+} from '../types';
 import { getTemplate } from '../types/templates';
+import { normalizePresetName } from './presets';
+import { deriveMonthlyCounts, parseMonthlyCounts } from './quota';
 
 /**
  * Single source of truth for reading and writing the saved game state.
  *
  * Everything the app remembers between launches lives under two keys: this one
- * for games and the Pro flag, and `scorekeeper/language/v1` for the language
- * override (owned by `src/i18n`, since it has to be applied before the first
- * render). Nothing else is persisted.
+ * for games, presets, the monthly game tally and the Pro flag, and
+ * `scorekeeper/language/v1` for the language override (owned by `src/i18n`,
+ * since it has to be applied before the first render). Nothing else is
+ * persisted.
  */
 export const STORAGE_KEY = 'scorekeeper/state/v1';
 
@@ -21,6 +32,8 @@ export const EMPTY_STATE: PersistedState = {
   activeGameId: null,
   isPro: false,
   displayName: '',
+  presets: [],
+  monthlyGameCounts: {},
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -106,6 +119,42 @@ export function parseGame(raw: unknown): Game | null {
 }
 
 /**
+ * Validates one saved preset. A preset with no usable name could never be
+ * picked from the library, so it is dropped rather than shown as a blank card.
+ */
+export function parsePreset(raw: unknown): GamePreset | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string') return null;
+
+  const name = normalizePresetName(str(raw.name, ''));
+  if (!name) return null;
+
+  const template = getTemplate(str(raw.templateId, 'standard'));
+  const quickButtons =
+    Array.isArray(raw.quickButtons) && raw.quickButtons.length > 0
+      ? raw.quickButtons.map((v) => num(v, 1))
+      : [...template.quickButtons];
+  const playerNames = Array.isArray(raw.playerNames)
+    ? raw.playerNames
+        .filter((n): n is string => typeof n === 'string')
+        .map((n) => n.slice(0, DISPLAY_NAME_MAX_LENGTH))
+    : [];
+  const createdAt = num(raw.createdAt, Date.now());
+
+  return {
+    id: raw.id,
+    name,
+    templateId: template.id,
+    winCondition: raw.winCondition === 'lowest' ? 'lowest' : 'highest',
+    quickButtons,
+    targetScore: typeof raw.targetScore === 'number' ? raw.targetScore : undefined,
+    maxRounds: typeof raw.maxRounds === 'number' ? raw.maxRounds : undefined,
+    playerNames,
+    createdAt,
+    updatedAt: num(raw.updatedAt, createdAt),
+  };
+}
+
+/**
  * Turns whatever is in storage into state the app can trust. Anything
  * unreadable degrades to the empty state rather than throwing on launch.
  */
@@ -133,12 +182,25 @@ export function parsePersistedState(raw: string | null): PersistedState {
     .filter((g) => g.isActive)
     .sort((a, b) => b.updatedAt - a.updatedAt)[0];
 
+  const presets = Array.isArray(parsed.presets)
+    ? parsed.presets.map(parsePreset).filter((p): p is GamePreset => p !== null)
+    : [];
+
+  // Anyone who last saved before the quota existed has no tally, so it is
+  // seeded from the games they have already finished. After that the stored
+  // tally is the only source: it must not move when history is deleted.
+  const monthlyGameCounts: MonthlyGameCounts = isRecord(parsed.monthlyGameCounts)
+    ? parseMonthlyCounts(parsed.monthlyGameCounts)
+    : deriveMonthlyCounts(games);
+
   return {
     games,
     activeGameId: pointerIsUsable ? pointer : (newestActive?.id ?? null),
     isPro: parsed.isPro === true,
     // Absent for anyone who saved state before the settings screen existed.
     displayName: str(parsed.displayName, '').slice(0, DISPLAY_NAME_MAX_LENGTH),
+    presets,
+    monthlyGameCounts,
   };
 }
 

@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
+  Bookmark,
   Crown,
   ExternalLink,
   Globe,
@@ -28,7 +29,11 @@ import { RootStackParamList } from '../navigation';
 import ScreenHeader from '../components/ScreenHeader';
 import { Avatar, Card, GradientButton, SectionLabel } from '../components/ui';
 import { useTheme } from '../theme';
-import { useGame, FREE_PLAYER_LIMIT } from '../context/GameContext';
+import {
+  useGame,
+  FREE_MONTHLY_GAME_LIMIT,
+  FREE_PLAYER_LIMIT,
+} from '../context/GameContext';
 import { DISPLAY_NAME_MAX_LENGTH } from '../utils/persistence';
 import * as haptics from '../utils/haptics';
 import {
@@ -57,7 +62,15 @@ const MANAGE_SUBSCRIPTION_URL = Platform.select({
 export default function SettingsScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
-  const { displayName, setDisplayName, isPro, unlockPro, stats } = useGame();
+  const {
+    displayName,
+    setDisplayName,
+    gamesThisMonth,
+    isPro,
+    presets,
+    unlockPro,
+    stats,
+  } = useGame();
 
   // Editing is local so every keystroke is not trimmed and written to storage;
   // the context (and AsyncStorage) take the value on blur.
@@ -174,10 +187,34 @@ export default function SettingsScreen({ navigation }: Props) {
                 <Text style={[theme.type.label, { color: theme.colors.textMuted }]}>
                   {isPro
                     ? t('settings.tierProHint')
-                    : t('settings.tierFreeHint', { count: FREE_PLAYER_LIMIT })}
+                    : t('settings.tierFreeHint', {
+                        players: FREE_PLAYER_LIMIT,
+                        games: FREE_MONTHLY_GAME_LIMIT,
+                      })}
                 </Text>
               </View>
             </View>
+
+            {/* How much of this month's free allowance is gone. */}
+            {!isPro ? (
+              <View style={styles.quotaBlock}>
+                <View style={styles.quotaRow}>
+                  <Text style={[theme.type.label, { color: theme.colors.text }]}>
+                    {t('quota.title')}
+                  </Text>
+                  <Text style={[theme.type.label, { color: theme.colors.textMuted }]}>
+                    {t('quota.used', {
+                      used: Math.min(gamesThisMonth, FREE_MONTHLY_GAME_LIMIT),
+                      limit: FREE_MONTHLY_GAME_LIMIT,
+                    })}
+                  </Text>
+                </View>
+                <QuotaBar used={gamesThisMonth} limit={FREE_MONTHLY_GAME_LIMIT} />
+                <Text style={[theme.type.caption, styles.hint, { color: theme.colors.textFaint }]}>
+                  {t('quota.resetsHint')}
+                </Text>
+              </View>
+            ) : null}
 
             {!isPro ? (
               <GradientButton
@@ -273,10 +310,45 @@ export default function SettingsScreen({ navigation }: Props) {
               value={stats.playersRecorded}
               label={t('settings.statPlayers')}
             />
+            <StatTile
+              icon={<Bookmark size={18} color={theme.colors.success} />}
+              value={presets.length}
+              label={t('settings.statPresets')}
+            />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+/**
+ * How much of the monthly allowance is spent. The fill turns danger-red once
+ * the quota is gone, so the row reads the same as the block on the home screen.
+ */
+function QuotaBar({ used, limit }: { used: number; limit: number }) {
+  const theme = useTheme();
+  const ratio = limit <= 0 ? 1 : Math.min(1, used / limit);
+  const spent = used >= limit;
+
+  return (
+    <View
+      style={[
+        styles.quotaTrack,
+        { backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radii.pill },
+      ]}
+    >
+      <View
+        style={[
+          styles.quotaFill,
+          {
+            width: `${ratio * 100}%`,
+            borderRadius: theme.radii.pill,
+            backgroundColor: spent ? theme.colors.danger : theme.colors.primary,
+          },
+        ]}
+      />
+    </View>
   );
 }
 
@@ -377,6 +449,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   divider: { height: 1 },
+  quotaBlock: { gap: 6 },
+  quotaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  quotaTrack: { height: 6, overflow: 'hidden' },
+  quotaFill: { height: 6 },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pill: {

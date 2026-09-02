@@ -13,9 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
-  BarChart3,
+  Bookmark,
   Check,
   Crown,
+  Dices,
   ShieldOff,
   Users,
   Volume2,
@@ -24,7 +25,11 @@ import {
 
 import { RootStackParamList } from '../navigation';
 import { useTheme } from '../theme';
-import { useGame, FREE_PLAYER_LIMIT } from '../context/GameContext';
+import {
+  useGame,
+  FREE_MONTHLY_GAME_LIMIT,
+  FREE_PLAYER_LIMIT,
+} from '../context/GameContext';
 import * as haptics from '../utils/haptics';
 import ExitOfferSheet from '../components/ExitOfferSheet';
 import {
@@ -226,21 +231,29 @@ export default function PaywallModal({ navigation, route }: Props) {
     });
   };
 
+  // Ordered by what the free tier actually runs into: the monthly game quota
+  // first, then the presets it cannot save, then the caps on players and
+  // history. The two perks that are not gated by a limit come last.
   const features = [
     {
+      icon: <Dices size={22} color={theme.colors.primary} />,
+      title: t('paywall.featureUnlimitedGames'),
+      desc: t('paywall.featureUnlimitedGamesDesc', { count: FREE_MONTHLY_GAME_LIMIT }),
+    },
+    {
+      icon: <Bookmark size={22} color={theme.colors.primary} />,
+      title: t('paywall.featurePresets'),
+      desc: t('paywall.featurePresetsDesc'),
+    },
+    {
       icon: <Users size={22} color={theme.colors.primary} />,
-      title: t('paywall.featureUnlimitedPlayers'),
-      desc: t('paywall.featureUnlimitedPlayersDesc', { count: FREE_PLAYER_LIMIT }),
+      title: t('paywall.featurePlayersHistory'),
+      desc: t('paywall.featurePlayersHistoryDesc', { count: FREE_PLAYER_LIMIT }),
     },
     {
       icon: <Volume2 size={22} color={theme.colors.primary} />,
       title: t('paywall.featureVoice'),
       desc: t('paywall.featureVoiceDesc'),
-    },
-    {
-      icon: <BarChart3 size={22} color={theme.colors.primary} />,
-      title: t('paywall.featureHistory'),
-      desc: t('paywall.featureHistoryDesc'),
     },
     {
       icon: <ShieldOff size={22} color={theme.colors.primary} />,

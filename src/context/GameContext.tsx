@@ -7,7 +7,16 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Game, GameRules, PersistedState, Player, Round, WinCondition } from '../types';
+import {
+  Game,
+  GamePreset,
+  GameRules,
+  MonthlyGameCounts,
+  PersistedState,
+  Player,
+  Round,
+  WinCondition,
+} from '../types';
 import { getTemplate } from '../types/templates';
 import { rulesFromTemplate } from '../utils/rules';
 import {
@@ -15,6 +24,18 @@ import {
   loadPersistedState,
   savePersistedState,
 } from '../utils/persistence';
+import {
+  canSavePreset,
+  findPresetByName,
+  normalizePresetName,
+} from '../utils/presets';
+import {
+  FREE_MONTHLY_GAME_LIMIT as MONTHLY_LIMIT,
+  gamesInMonth,
+  gamesRemaining,
+  monthKey,
+  recordCompletedGame,
+} from '../utils/quota';
 import { restoreStoredLanguage } from '../i18n';
 import {
   configurePurchases,
@@ -25,6 +46,27 @@ import {
 
 /** Free tier is capped; unlocking Pro removes the limit. */
 export const FREE_PLAYER_LIMIT = 4;
+
+/** Re-exported so screens have one place to read the free tier's limits. */
+export { FREE_MONTHLY_GAME_LIMIT } from '../utils/quota';
+export { FREE_PRESET_LIMIT } from '../utils/presets';
+
+/** The setup a preset is being saved from. */
+export interface NewPresetInput {
+  name: string;
+  templateId: string;
+  rules: GameRules;
+  playerNames: string[];
+}
+
+/**
+ * Why a save did or did not happen. `limit` is the caller's cue to offer the
+ * paywall; `invalid` only happens if an empty name gets through the sheet.
+ */
+export type SavePresetResult =
+  | { status: 'saved'; preset: GamePreset }
+  | { status: 'limit' }
+  | { status: 'invalid' };
 
 interface NewGameOptions {
   templateId: string;
@@ -51,6 +93,19 @@ interface GameContextValue {
   setDisplayName: (name: string) => void;
   /** Lifetime totals over completed games, for the settings screen. */
   stats: { gamesPlayed: number; playersRecorded: number };
+  /** Saved game configurations, most recently saved first. */
+  presets: GamePreset[];
+  /** Games finished in the current calendar month. */
+  gamesThisMonth: number;
+  /** Games left in the free monthly quota; null when unlimited (Pro). */
+  gamesRemainingThisMonth: number | null;
+  /** False once a free user has used up this month's quota. */
+  canStartGame: boolean;
+  /** False once the tier's preset slots are full; replacing still works. */
+  canSaveAnotherPreset: boolean;
+  /** Saves, or replaces the preset already using that name. */
+  savePreset: (input: NewPresetInput) => SavePresetResult;
+  deletePreset: (presetId: string) => void;
   createGame: (options: NewGameOptions) => Game;
   /** Points the game screen at an existing paused session. */
   resumeGame: (gameId: string) => void;
@@ -67,6 +122,11 @@ interface GameContextValue {
   unlockPro: () => void;
   /** Debug/testing helper: re-locks Pro so paywall triggers can be re-tested. */
   resetPro: () => void;
+  /**
+   * Debug/testing helper: spends or refunds this month's whole free quota, so
+   * the limit can be walked into without playing five games first.
+   */
+  setMonthlyQuotaFilled: (filled: boolean) => void;
 }
 
 const GameContext = createContext<GameContextValue | undefined>(undefined);
@@ -98,6 +158,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
   const [isPro, setIsPro] = useState(false);
   const [displayName, setDisplayNameState] = useState('');
+  const [presets, setPresets] = useState<GamePreset[]>([]);
+  const [monthlyGameCounts, setMonthlyGameCounts] = useState<MonthlyGameCounts>({});
 
   // Avoid writing back the initial empty state before hydration completes.
   const hydrated = useRef(false);
@@ -115,6 +177,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         const storedIsPro = stored.isPro;
         setIsPro(storedIsPro);
         setDisplayNameState(stored.displayName);
+        setPresets(stored.presets);
+        setMonthlyGameCounts(stored.monthlyGameCounts);
 
         if (isMockMode()) {
           // No store to ask: the persisted flag is the source of truth, which
@@ -139,9 +203,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated.current) return;
-    const state: PersistedState = { games, activeGameId, isPro, displayName };
+    const state: PersistedState = {
+      games,
+      activeGameId,
+      isPro,
+      displayName,
+      presets,
+      monthlyGameCounts,
+    };
     savePersistedState(state);
-  }, [games, activeGameId, isPro, displayName]);
+  }, [games, activeGameId, isPro, displayName, presets, monthlyGameCounts]);
 
   const activeGame = useMemo(
     () => games.find((g) => g.id === activeGameId && g.isActive) ?? null,
@@ -179,8 +250,70 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     return { gamesPlayed: completedGames.length, playersRecorded: names.size };
   }, [completedGames]);
 
+  // Most recently saved first, matching how sessions and history are ordered.
+  // Loading a preset does not touch `updatedAt`, so the order a player learns
+  // stays put while they use it.
+  const sortedPresets = useMemo(
+    () => [...presets].sort((a, b) => b.updatedAt - a.updatedAt),
+    [presets]
+  );
+
+  /**
+   * The monthly quota. Read at render from the stored tally, so it is refreshed
+   * by any state change; a session left open across a month boundary catches up
+   * the next time anything happens rather than at midnight on the 1st.
+   */
+  const gamesThisMonth = useMemo(() => gamesInMonth(monthlyGameCounts), [monthlyGameCounts]);
+  const gamesRemainingThisMonth = useMemo(
+    () => gamesRemaining(monthlyGameCounts, isPro),
+    [monthlyGameCounts, isPro]
+  );
+  const canStartGame = gamesRemainingThisMonth === null || gamesRemainingThisMonth > 0;
+  const canSaveAnotherPreset = canSavePreset(presets, isPro);
+
   const setDisplayName = useCallback((name: string) => {
     setDisplayNameState(name.trim().slice(0, DISPLAY_NAME_MAX_LENGTH));
+  }, []);
+
+  /**
+   * Saving under a name that is already taken replaces that preset rather than
+   * adding a second one — that is also how the free tier's single slot gets
+   * re-used, so hitting the cap never leaves the user unable to edit it.
+   */
+  const savePreset = useCallback(
+    (input: NewPresetInput): SavePresetResult => {
+      const name = normalizePresetName(input.name);
+      if (!name) return { status: 'invalid' };
+
+      const existing = findPresetByName(presets, name);
+      if (!existing && !canSavePreset(presets, isPro)) return { status: 'limit' };
+
+      const now = Date.now();
+      const preset: GamePreset = {
+        id: existing?.id ?? makeId('preset'),
+        name,
+        templateId: getTemplate(input.templateId).id,
+        winCondition: input.rules.winCondition,
+        quickButtons: [...input.rules.quickButtons],
+        targetScore: input.rules.targetScore,
+        maxRounds: input.rules.maxRounds,
+        playerNames: input.playerNames.map((n) =>
+          n.trim().slice(0, DISPLAY_NAME_MAX_LENGTH)
+        ),
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      };
+
+      setPresets((prev) =>
+        existing ? prev.map((p) => (p.id === existing.id ? preset : p)) : [...prev, preset]
+      );
+      return { status: 'saved', preset };
+    },
+    [presets, isPro]
+  );
+
+  const deletePreset = useCallback((presetId: string) => {
+    setPresets((prev) => prev.filter((p) => p.id !== presetId));
   }, []);
 
   const createGame = useCallback((options: NewGameOptions): Game => {
@@ -272,13 +405,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const endGame = useCallback((): string | null => {
     const endedId = activeGameId;
+    if (!endedId) return null;
+    const completedAt = Date.now();
     setGames((prev) =>
       prev.map((game) =>
         game.id === endedId
-          ? { ...game, isActive: false, completedAt: Date.now(), updatedAt: Date.now() }
+          ? { ...game, isActive: false, completedAt, updatedAt: completedAt }
           : game
       )
     );
+    // The quota counts finished games, and is kept apart from the history list
+    // so deleting a game cannot buy another one.
+    setMonthlyGameCounts((prev) => recordCompletedGame(prev, completedAt));
     setActiveGameId(null);
     return endedId;
   }, [activeGameId]);
@@ -308,6 +446,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (isMockMode()) setMockProState(false);
   }, []);
 
+  const setMonthlyQuotaFilled = useCallback((filled: boolean) => {
+    // A zero is dropped on the next read, which is what makes this a reset.
+    setMonthlyGameCounts((prev) => ({ ...prev, [monthKey()]: filled ? MONTHLY_LIMIT : 0 }));
+  }, []);
+
   const value: GameContextValue = {
     ready,
     games,
@@ -318,6 +461,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     displayName,
     setDisplayName,
     stats,
+    presets: sortedPresets,
+    gamesThisMonth,
+    gamesRemainingThisMonth,
+    canStartGame,
+    canSaveAnotherPreset,
+    savePreset,
+    deletePreset,
     createGame,
     resumeGame,
     applyScore,
@@ -327,6 +477,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     clearHistory,
     unlockPro,
     resetPro,
+    setMonthlyQuotaFilled,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

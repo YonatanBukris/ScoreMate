@@ -1,9 +1,9 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Lock, Unlock } from 'lucide-react-native';
+import { CalendarClock, Lock, Unlock } from 'lucide-react-native';
 
 import { useTheme } from '../theme';
-import { useGame } from '../context/GameContext';
+import { useGame, FREE_MONTHLY_GAME_LIMIT } from '../context/GameContext';
 import * as haptics from '../utils/haptics';
 
 /**
@@ -16,7 +16,14 @@ import * as haptics from '../utils/haptics';
  */
 export default function DevBar() {
   const theme = useTheme();
-  const { isPro, unlockPro, resetPro } = useGame();
+  const {
+    gamesThisMonth,
+    isPro,
+    resetPro,
+    setMonthlyQuotaFilled,
+    unlockPro,
+  } = useGame();
+  const quotaSpent = gamesThisMonth >= FREE_MONTHLY_GAME_LIMIT;
 
   if (!__DEV__) return null;
 
@@ -57,6 +64,38 @@ export default function DevBar() {
           {isPro ? 'DEV: Lock Pro (reset paywall)' : 'DEV: Unlock Pro'}
         </Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => {
+          haptics.warning();
+          setMonthlyQuotaFilled(!quotaSpent);
+        }}
+        accessibilityRole="button"
+        style={[
+          styles.proToggle,
+          styles.secondToggle,
+          {
+            borderColor: quotaSpent ? theme.colors.success : theme.colors.danger,
+            backgroundColor: theme.colors.surfaceAlt,
+          },
+        ]}
+      >
+        <CalendarClock
+          size={16}
+          color={quotaSpent ? theme.colors.success : theme.colors.danger}
+        />
+        <Text
+          style={[
+            styles.proToggleText,
+            { color: quotaSpent ? theme.colors.success : theme.colors.danger },
+          ]}
+        >
+          {quotaSpent
+            ? 'DEV: Refund monthly quota'
+            : `DEV: Spend monthly quota (${gamesThisMonth}/${FREE_MONTHLY_GAME_LIMIT})`}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -74,4 +113,5 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   proToggleText: { fontSize: 13, fontWeight: '700' },
+  secondToggle: { marginTop: 8 },
 });

@@ -72,6 +72,30 @@ export interface Game extends GameRules {
   isActive: boolean;
 }
 
+/**
+ * A saved game configuration the user can reload in one tap. Presets carry
+ * both the scoring rules and the table they were last played with, so loading
+ * one restores the whole setup and not just the numbers.
+ */
+export interface GamePreset extends GameRules {
+  id: string;
+  /** User-supplied label, e.g. "Yaniv" or "Friday Rummikub". */
+  name: string;
+  /** The template the preset was built on, kept for display and history. */
+  templateId: GameModeType;
+  /** Default player slots, in order. Entries may be blank. */
+  playerNames: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * Completed games per calendar month, keyed `YYYY-MM` in device local time.
+ * The free tier's monthly quota is read from here rather than counted from
+ * history, so clearing the history cannot hand out a fresh month's games.
+ */
+export type MonthlyGameCounts = Record<string, number>;
+
 /** Persisted application state. */
 export interface PersistedState {
   games: Game[];
@@ -79,4 +103,7 @@ export interface PersistedState {
   isPro: boolean;
   /** The player's own name, used to prefill the first slot of a new game. */
   displayName: string;
+  /** The user's saved game configurations, newest first. */
+  presets: GamePreset[];
+  monthlyGameCounts: MonthlyGameCounts;
 }
