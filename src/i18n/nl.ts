@@ -62,7 +62,7 @@ const nl: TranslationSchema = {
     used: '{{used}} van {{limit}} gebruikt',
     unlimited: 'Onbeperkt spellen',
     resetsHint: 'Je gratis spellen worden op de 1e van elke maand hersteld.',
-    limitTitle: 'Gratis maandlimiet bereikt',
+    limitTitle: 'Maandlimiet bereikt',
     limitMessage:
       'Je hebt je gratis limiet van {{count}} spellen deze maand bereikt. Upgrade naar ScoreMate Pro voor onbeperkt spellen of wacht tot volgende maand.',
   },

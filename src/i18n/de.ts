@@ -62,7 +62,7 @@ const de: TranslationSchema = {
     used: '{{used}} von {{limit}} genutzt',
     unlimited: 'Unbegrenzte Spiele',
     resetsHint: 'Deine Gratis-Spiele werden am 1. jedes Monats zurückgesetzt.',
-    limitTitle: 'Gratis-Limit für diesen Monat erreicht',
+    limitTitle: 'Monatslimit erreicht',
     limitMessage:
       'Du hast dein Gratis-Limit von {{count}} Spielen in diesem Monat erreicht. Hol dir ScoreMate Pro für unbegrenzte Spiele oder warte bis zum nächsten Monat.',
   },

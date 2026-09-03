@@ -60,7 +60,7 @@ const en = {
     used: '{{used}} of {{limit}} used',
     unlimited: 'Unlimited games',
     resetsHint: 'Your free games reset on the 1st of each month.',
-    limitTitle: 'Free monthly limit reached',
+    limitTitle: 'Monthly limit reached',
     limitMessage:
       "You've reached your free limit of {{count}} games this month. Upgrade to ScoreMate Pro for unlimited games or wait until next month.",
   },

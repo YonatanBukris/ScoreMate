@@ -52,6 +52,7 @@ import { DEFAULT_CUSTOM_RULES, rulesFromTemplate } from '../utils/rules';
 import { formatQuickButtons, rulesFromPreset } from '../utils/presets';
 import { relativeTime } from '../utils/time';
 import CustomRulesSheet from '../components/CustomRulesSheet';
+import QuotaLimitModal from '../components/QuotaLimitModal';
 import ResumeSessionsSheet from '../components/ResumeSessionsSheet';
 import SavePresetSheet from '../components/SavePresetSheet';
 import {
@@ -64,6 +65,7 @@ import {
   SectionLabel,
 } from '../components/ui';
 import * as haptics from '../utils/haptics';
+import { useQuotaGate } from '../hooks/useQuotaGate';
 import { track } from '../services/analyticsService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -84,13 +86,11 @@ export default function HomeScreen({ navigation }: Props) {
   const {
     activeGames,
     canSaveAnotherPreset,
-    canStartGame,
     createGame,
     deletePreset,
     deleteGame,
     displayName,
     gamesRemainingThisMonth,
-    gamesThisMonth,
     isPro,
     presets,
     resumeGame,
@@ -111,6 +111,12 @@ export default function HomeScreen({ navigation }: Props) {
   const [setupVisible, setSetupVisible] = useState(false);
   const [sessionsVisible, setSessionsVisible] = useState(false);
   const [savePresetVisible, setSavePresetVisible] = useState(false);
+
+  /**
+   * The monthly quota bites at the start of a game rather than at the end, so
+   * nobody plays a full round of Rummy only to be told it will not be saved.
+   */
+  const quotaGate = useQuotaGate('setup');
 
   // The banner speaks for the session played most recently.
   const latestSession = activeGames[0] ?? null;
@@ -214,31 +220,6 @@ export default function HomeScreen({ navigation }: Props) {
     return template.id === 'custom' ? customRules : rulesFromTemplate(template);
   };
 
-  /**
-   * The monthly quota bites here rather than at the end of a game, so nobody
-   * plays a full round of Rummy only to be told it will not be saved.
-   */
-  const blockedByQuota = (from: 'setup' | 'rematch'): boolean => {
-    if (canStartGame) return false;
-    haptics.warning();
-    track({
-      name: 'game_quota_blocked',
-      properties: { gamesThisMonth, limit: FREE_MONTHLY_GAME_LIMIT, from },
-    });
-    Alert.alert(
-      t('quota.limitTitle'),
-      t('quota.limitMessage', { count: FREE_MONTHLY_GAME_LIMIT }),
-      [
-        { text: t('paywall.maybeLater'), style: 'cancel' },
-        {
-          text: t('paywall.unlock'),
-          onPress: () => navigation.navigate('Paywall', { trigger: 'game_quota' }),
-        },
-      ]
-    );
-    return true;
-  };
-
   const startGame = () => {
     const filled = names.map((n, i) => n.trim() || t('home.playerNamePlaceholder', { number: i + 1 }));
     if (filled.length < 2) {
@@ -246,7 +227,7 @@ export default function HomeScreen({ navigation }: Props) {
       Alert.alert(t('app.title'), t('home.needTwoPlayers'));
       return;
     }
-    if (blockedByQuota('setup')) return;
+    if (quotaGate.blocked()) return;
     haptics.success();
     createGame({ templateId, playerNames: filled, rules: setupRules });
     navigation.navigate('Game');
@@ -659,6 +640,8 @@ export default function HomeScreen({ navigation }: Props) {
           setSetupVisible(false);
         }}
       />
+
+      <QuotaLimitModal {...quotaGate.modalProps} />
 
       <SavePresetSheet
         visible={savePresetVisible}

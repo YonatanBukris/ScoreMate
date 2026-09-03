@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
-  Alert,
   Animated,
   ScrollView,
   StyleSheet,
@@ -25,10 +24,12 @@ import {
   Pressable3D,
   SectionLabel,
 } from '../components/ui';
-import { useGame, FREE_MONTHLY_GAME_LIMIT } from '../context/GameContext';
+import { useGame } from '../context/GameContext';
 import { getSpeechLocale } from '../i18n';
 import { rankPlayers, type RankedPlayer } from '../utils/ranking';
 import { rulesFromGame } from '../utils/rules';
+import { useQuotaGate } from '../hooks/useQuotaGate';
+import QuotaLimitModal from '../components/QuotaLimitModal';
 import { Round } from '../types';
 import * as haptics from '../utils/haptics';
 import { track } from '../services/analyticsService';
@@ -57,7 +58,11 @@ const COLUMN_ORDER = [2, 1, 3];
 export default function PodiumScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
-  const { games, canStartGame, createGame, gamesThisMonth, isPro } = useGame();
+  const { games, createGame, isPro } = useGame();
+
+  // A rematch is the most common place the quota runs out: the game that just
+  // finished is the one that spent it.
+  const quotaGate = useQuotaGate('rematch');
 
   const game = useMemo(
     () => games.find((g) => g.id === route.params.gameId) ?? null,
@@ -156,23 +161,8 @@ export default function PodiumScreen({ navigation, route }: Props) {
     if (!game) return;
     // The game just finished counted against the quota, so a rematch is where
     // a free user most often runs into the limit.
-    if (!canStartGame) {
-      haptics.warning();
-      track({
-        name: 'game_quota_blocked',
-        properties: { gamesThisMonth, limit: FREE_MONTHLY_GAME_LIMIT, from: 'rematch' },
-      });
-      Alert.alert(
-        t('quota.limitTitle'),
-        t('quota.limitMessage', { count: FREE_MONTHLY_GAME_LIMIT }),
-        [
-          { text: t('paywall.maybeLater'), style: 'cancel' },
-          {
-            text: t('paywall.unlock'),
-            onPress: () => navigation.navigate('Paywall', { trigger: 'game_quota' }),
-          },
-        ]
-      );
+    if (quotaGate.blocked()) {
+      Speech.stop();
       return;
     }
     haptics.success();
@@ -350,6 +340,8 @@ export default function PodiumScreen({ navigation, route }: Props) {
           </Pressable3D>
         </View>
       </ScrollView>
+
+      <QuotaLimitModal {...quotaGate.modalProps} />
     </SafeAreaView>
   );
 }
